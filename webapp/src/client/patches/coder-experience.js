@@ -65,19 +65,21 @@ const coderFormFieldEntries = {
  * as an event. This function assumes that all characters in the input will be
  * UTF-8.
  *
- * @todo See if there's a better way to implement this logic. One problem is
- * that because it sets the .value property on an element before dispatching an
- * event, Angular is going to complain. As far as I can tell, this won't ever
- * break anything, but it's a warning, because Angular patches a lot of browser
- * APIs to support change detection.
+ * Note: this code will never break, but you might get warnings in the console
+ * from Angular about unexpected value changes. The only way to update the input
+ * and keep Angular aware of it is by updating the input's .value property, and
+ * then firing an input event. The input event is what syncs the HTML back to
+ * Angular's internal state.
+ *
+ * So, the code will briefly update an input's value, which Angular won't be
+ * happy about, but then the input event will fire, making things right again.
  *
  * @param {HTMLInputElement} inputField
  * @param {string} inputText
  * @returns {Promise<void>}
  */
 function setInputValue(inputField, inputText) {
-  const characterDelayMs = 5;
-  const continueEventName = "coder-patch-continue";
+  const continueEventName = "coder-patch:continue";
 
   const promise = /** @type {Promise<void>} */ (
     new Promise((resolve, reject) => {
@@ -85,8 +87,10 @@ function setInputValue(inputField, inputText) {
       // write new text to it
       let i = -1;
 
-      /** @type {number | undefined} */
-      let currentAnimationId = undefined;
+      // requestAnimationFrame is not capable of giving back values of 0 for its
+      // task IDs. Good default value to ensure that we don't need if statements
+      // when trying to cancel anything
+      let currentAnimationId = 0;
 
       /** @returns {void} */
       const handleNextCharIndex = () => {
@@ -105,8 +109,7 @@ function setInputValue(inputField, inputText) {
             continueEventName,
             () => {
               i++;
-              currentAnimationId =
-                window.requestAnimationFrame(handleNextCharIndex);
+              currentAnimationId = requestAnimationFrame(handleNextCharIndex);
             },
             { once: true }
           );
@@ -126,11 +129,12 @@ function setInputValue(inputField, inputText) {
           inputField.dispatchEvent(inputEvent);
           inputField.dispatchEvent(continueEvent);
         } catch (err) {
+          cancelAnimationFrame(currentAnimationId);
           reject(err);
         }
       };
 
-      currentAnimationId = window.requestAnimationFrame(handleNextCharIndex);
+      currentAnimationId = requestAnimationFrame(handleNextCharIndex);
     })
   );
 
@@ -192,6 +196,8 @@ async function autoSubmitForm(myForm) {
   };
 
   const setCoderFormFieldValues = async () => {
+    // The RDP form will not appear on screen unless the dropdown is set to use
+    // the RDP protocol
     const rdpSubsection = myForm.querySelector("rdp-form");
     if (rdpSubsection === null) {
       throw new Error(
@@ -206,7 +212,7 @@ async function autoSubmitForm(myForm) {
 
       if (input === null) {
         throw new Error(
-          `Unable to element that matches query "${querySelector}`
+          `Unable to element that matches query "${querySelector}"`
         );
       }
 
@@ -262,7 +268,7 @@ function setupFormDetection() {
     // Only try to auto-fill it if we went from having no form on screen to
     // having a form on screen. That way, we don't accidentally override the
     // form if the user is trying to customize values, and this essentially
-    // make the form values function as default values.
+    // make the script values function as default values.
     if (formValueFromLastMutation === null) {
       autoSubmitForm(latestForm);
     }
@@ -276,11 +282,13 @@ function setupFormDetection() {
   /** @returns {void} */
   const checkScreenForDynamicTab = () => {
     const dynamicTab = document.querySelector("web-client-dynamic-tab");
+
+    // Keep polling until the main content container is on screen
     if (dynamicTab === null) {
       return;
     }
 
-    window.clearInterval(intervalId);
+    clearInterval(intervalId);
 
     // Call the mutation callback manually, to ensure it runs at least once
     onDynamicTabMutation();
@@ -290,10 +298,7 @@ function setupFormDetection() {
     });
   };
 
-  intervalId = window.setTimeout(
-    checkScreenForDynamicTab,
-    SCREEN_POLL_INTERVAL_MS
-  );
+  intervalId = setTimeout(checkScreenForDynamicTab, SCREEN_POLL_INTERVAL_MS);
 }
 
 /**
@@ -303,9 +308,15 @@ function setupFormDetection() {
  * @returns {void}
  */
 function setupObscuringStyles() {
-  const styleContainer = document.createElement("style");
-  styleContainer.type = "text/css";
+  const styleId = "coder-patch:styles";
 
+  const existingContainer = document.querySelector(`#${styleId}`);
+  if (existingContainer) {
+    return;
+  }
+
+  const styleContainer = document.createElement("style");
+  styleContainer.id = styleId;
   styleContainer.innerHTML = `
     /* app-menu corresponds to the sidebar of the default view. */
     app-menu {
@@ -316,5 +327,9 @@ function setupObscuringStyles() {
   document.head.appendChild(styleContainer);
 }
 
-// setupObscuringStyles();
+// Always safe to call setupObscuringStyles immediately because even if the
+// Angular app isn't loaded by the time the function gets called, the CSS will
+// always be globally available for when Angular is finally ready
+setupObscuringStyles();
+
 // window.addEventListener("DOMContentLoaded", setupFormDetection);
