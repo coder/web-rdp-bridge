@@ -48,13 +48,13 @@ const formFieldEntries = {
   /** @readonly */
   username: {
     querySelector: "web-client-username-control input",
-    value: "Administrator",
+    value: "{{ CODER_USERNAME }}",
   },
 
   /** @readonly */
   password: {
     querySelector: "web-client-password-control input",
-    value: "coderRDP!",
+    value: "{{ CODER_PASSWORD }}",
   },
 };
 
@@ -123,7 +123,8 @@ function setInputValue(inputField, inputText) {
             continueEventName,
             () => {
               i++;
-              currentAnimationId = requestAnimationFrame(handleNextCharIndex);
+              currentAnimationId =
+                window.requestAnimationFrame(handleNextCharIndex);
             },
             { once: true }
           );
@@ -142,7 +143,7 @@ function setInputValue(inputField, inputText) {
         }
       };
 
-      currentAnimationId = requestAnimationFrame(handleNextCharIndex);
+      currentAnimationId = window.requestAnimationFrame(handleNextCharIndex);
     })
   );
 
@@ -264,6 +265,8 @@ function setupFormDetection() {
 
   /** @returns {void} */
   const onDynamicTabMutation = () => {
+    console.log("Ran on mutation!");
+
     /** @type {HTMLFormElement | null} */
     const latestForm = document.querySelector("web-client-form > form");
 
@@ -272,10 +275,10 @@ function setupFormDetection() {
       return;
     }
 
-    // Only try to auto-fill it if we went from having no form on screen to
+    // Only try to auto-fill if we went from having no form on screen to
     // having a form on screen. That way, we don't accidentally override the
     // form if the user is trying to customize values, and this essentially
-    // make the script values function as default values.
+    // makes the script values function as default values
     if (formValueFromLastMutation === null) {
       autoSubmitForm(latestForm);
     }
@@ -284,7 +287,7 @@ function setupFormDetection() {
   };
 
   /** @type {number | undefined} */
-  let intervalId = undefined;
+  let pollingId = undefined;
 
   /** @returns {void} */
   const checkScreenForDynamicTab = () => {
@@ -295,17 +298,26 @@ function setupFormDetection() {
       return;
     }
 
-    clearInterval(intervalId);
+    window.clearInterval(pollingId);
 
     // Call the mutation callback manually, to ensure it runs at least once
     onDynamicTabMutation();
+
+    // Having the mutation observer is kind of an extra safety net that isn't
+    // really expected to run that often. Most of the content in the dynamic
+    // tab is being rendered through Canvas, which won't trigger any mutations
+    // that the observer can detect
     const dynamicTabObserver = new MutationObserver(onDynamicTabMutation);
     dynamicTabObserver.observe(dynamicTab, {
+      subtree: true,
       childList: true,
     });
   };
 
-  intervalId = setTimeout(checkScreenForDynamicTab, SCREEN_POLL_INTERVAL_MS);
+  pollingId = window.setInterval(
+    checkScreenForDynamicTab,
+    SCREEN_POLL_INTERVAL_MS
+  );
 }
 
 /**
@@ -339,4 +351,8 @@ function setupObscuringStyles() {
 // always be globally available for when Angular is finally ready
 setupObscuringStyles();
 
-// window.addEventListener("DOMContentLoaded", setupFormDetection);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", setupFormDetection);
+} else {
+  setupFormDetection();
+}
