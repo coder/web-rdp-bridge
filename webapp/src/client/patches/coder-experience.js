@@ -73,61 +73,63 @@ const coderFormFieldEntries = {
  *
  * @param {HTMLInputElement} inputField
  * @param {string} inputText
- * @returns {Promise<void[]>}
+ * @returns {Promise<void>}
  */
 function setInputValue(inputField, inputText) {
   const characterDelayMs = 5;
-  const continueEventName = "continue";
+  const continueEventName = "coder-patch-continue";
 
-  const promise = new Promise((resolve, reject) => {
-    // -1 indicates a "pre-write" for clearing out the input before trying to
-    // write new text to it
-    let i = -1;
+  const promise = /** @type {Promise<void>} */ (
+    new Promise((resolve, reject) => {
+      // -1 indicates a "pre-write" for clearing out the input before trying to
+      // write new text to it
+      let i = -1;
 
-    /** @return {void} */
-    const handleNextCharIndex = () => {
-      if (i === inputText.length) {
-        resolve(void 0);
-        return;
-      }
-
-      const currentChar = inputText[i];
-      if (i !== -1 && currentChar === undefined) {
-        throw new Error("Went out of bounds");
-      }
-
-      try {
-        inputField.addEventListener(
-          continueEventName,
-          () => {
-            i++;
-            const newDelay = (i + 1) * characterDelayMs;
-            window.setTimeout(handleNextCharIndex, newDelay);
-          },
-          { once: true }
-        );
-
-        const continueEvent = new CustomEvent(continueEventName);
-        const inputEvent = new Event("input", {
-          bubbles: true,
-          cancelable: true,
-        });
-
-        if (i === -1) {
-          inputField.value = "";
-        } else {
-          inputField.value = `${inputField.value}${currentChar}`;
+      /** @returns {void} */
+      const handleNextCharIndex = () => {
+        if (i === inputText.length) {
+          resolve();
+          return;
         }
 
-        inputField.dispatchEvent(inputEvent);
-        inputField.dispatchEvent(continueEvent);
-      } catch (err) {
-        reject(err);
-      }
-    };
+        const currentChar = inputText[i];
+        if (i !== -1 && currentChar === undefined) {
+          throw new Error("Went out of bounds");
+        }
 
-    window.setTimeout(handleNextCharIndex, characterDelayMs);
-  });
+        try {
+          inputField.addEventListener(
+            continueEventName,
+            () => {
+              i++;
+              const newDelay = (i + 1) * characterDelayMs;
+              window.setTimeout(handleNextCharIndex, newDelay);
+            },
+            { once: true }
+          );
+
+          const continueEvent = new CustomEvent(continueEventName);
+          const inputEvent = new Event("input", {
+            bubbles: true,
+            cancelable: true,
+          });
+
+          if (i === -1) {
+            inputField.value = "";
+          } else {
+            inputField.value = `${inputField.value}${currentChar}`;
+          }
+
+          inputField.dispatchEvent(inputEvent);
+          inputField.dispatchEvent(continueEvent);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      window.setTimeout(handleNextCharIndex, characterDelayMs);
+    })
+  );
 
   return promise;
 }
@@ -159,7 +161,8 @@ async function autoSubmitForm(myForm) {
 
     // Can't use form as container for querying the list of dropdown options,
     // because the elements don't actually exist inside the form. I *think* this
-    // is to avoid CSS stacking context issues with the dropdown
+    // is to avoid CSS stacking context issues with the dropdown. This would
+    // make sure there's zero risk of the elements getting covered up visually
     /** @type {HTMLLIElement | null} */
     const protocolOption = document.querySelector(
       `p-dropdownitem[ng-reflect-label="${PROTOCOL}"] li`
