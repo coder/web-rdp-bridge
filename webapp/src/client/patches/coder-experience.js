@@ -19,14 +19,12 @@
  */
 
 /**
- * The communication protocol to set Devolutions to. Right now, this does not
- * need to be dynamic, and can be hard-coded as a constant.
+ * The communication protocol to set Devolutions to.
  */
 const PROTOCOL = "RDP";
 
 /**
- * The hostname to use with Devolutions. Can be a hard-coded constant for right
- * now; may need to change in the future?
+ * The hostname to use with Devolutions.
  */
 const HOSTNAME = "localhost";
 
@@ -46,7 +44,7 @@ const SCREEN_POLL_INTERVAL_MS = 500;
  *
  * @satisfies {FormFieldEntries}
  */
-const coderFormFieldEntries = {
+const formFieldEntries = {
   /** @readonly */
   username: {
     querySelector: "web-client-username-control input",
@@ -66,13 +64,15 @@ const coderFormFieldEntries = {
  * UTF-8.
  *
  * Note: this code will never break, but you might get warnings in the console
- * from Angular about unexpected value changes. The only way to update the input
- * and keep Angular aware of it is by updating the input's .value property, and
- * then firing an input event. The input event is what syncs the HTML back to
- * Angular's internal state.
+ * from Angular about unexpected value changes. Angular patches over a lot of
+ * the built-in browser APIs to support its component change detection system.
+ * As part of that, it has validations for checking whether an input it
+ * previously had control over changed without it doing anything.
  *
- * So, the code will briefly update an input's value, which Angular won't be
- * happy about, but then the input event will fire, making things right again.
+ * But the only way to simulate a keyboard input is by setting the input's
+ * .value property, and then firing an input event. So basically, the inner
+ * value will change, which Angular won't be happy about, but then the input
+ * event will fire and sync everything back together.
  *
  * @param {HTMLInputElement} inputField
  * @param {string} inputText
@@ -83,6 +83,11 @@ function setInputValue(inputField, inputText) {
 
   const promise = /** @type {Promise<void>} */ (
     new Promise((resolve, reject) => {
+      if (inputText === "") {
+        resolve();
+        return;
+      }
+
       // -1 indicates a "pre-write" for clearing out the input before trying to
       // write new text to it
       let i = -1;
@@ -91,6 +96,15 @@ function setInputValue(inputField, inputText) {
       // task IDs. Good default value to ensure that we don't need if statements
       // when trying to cancel anything
       let currentAnimationId = 0;
+
+      // Super easy to pool the same event objects, because the events don't
+      // have any custom, context-specific values on them, and they're
+      // restricted to this one callback.
+      const continueEvent = new CustomEvent(continueEventName);
+      const inputEvent = new Event("input", {
+        bubbles: true,
+        cancelable: true,
+      });
 
       /** @returns {void} */
       const handleNextCharIndex = () => {
@@ -113,12 +127,6 @@ function setInputValue(inputField, inputText) {
             },
             { once: true }
           );
-
-          const continueEvent = new CustomEvent(continueEventName);
-          const inputEvent = new Event("input", {
-            bubbles: true,
-            cancelable: true,
-          });
 
           if (i === -1) {
             inputField.value = "";
@@ -167,9 +175,9 @@ async function autoSubmitForm(myForm) {
     protocolDropdownTrigger.click();
 
     // Can't use form as container for querying the list of dropdown options,
-    // because the elements don't actually exist inside the form. I *think* this
-    // is to avoid CSS stacking context issues with the dropdown. This would
-    // make sure there's zero risk of the elements getting covered up visually
+    // because the elements don't actually exist inside the form. They're placed
+    // in the top level of the HTML doc, and repositioned to make it look like
+    // they're part of the form. Avoids CSS stacking context issues, maybe?
     /** @type {HTMLLIElement | null} */
     const protocolOption = document.querySelector(
       `p-dropdownitem[ng-reflect-label="${PROTOCOL}"] li`
@@ -205,8 +213,7 @@ async function autoSubmitForm(myForm) {
       );
     }
 
-    const iterable = Object.values(coderFormFieldEntries);
-    for (const { value, querySelector } of iterable) {
+    for (const { value, querySelector } of Object.values(formFieldEntries)) {
       /** @type {HTMLInputElement | null} */
       const input = document.querySelector(querySelector);
 
