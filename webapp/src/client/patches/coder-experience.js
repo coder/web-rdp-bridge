@@ -79,7 +79,7 @@ const formFieldEntries = {
  * @returns {Promise<void>}
  */
 function setInputValue(inputField, inputText) {
-  const continueEventName = "coder-patch:continue";
+  const continueEventName = "coder-patch--continue";
 
   const promise = /** @type {Promise<void>} */ (
     new Promise((resolve, reject) => {
@@ -315,7 +315,7 @@ function setupFormDetection() {
  * @returns {void}
  */
 function setupObscuringStyles() {
-  const styleId = "coder-patch:styles";
+  const styleId = "coder-patch--styles";
 
   const existingContainer = document.querySelector(`#${styleId}`);
   if (existingContainer) {
