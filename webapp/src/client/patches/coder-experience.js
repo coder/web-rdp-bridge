@@ -1,8 +1,5 @@
 // @ts-check
 /**
- * @todo Still need to polish up and test the logic for setting up the form
- * detector
- *
  * @file Defines the custom logic for patching in UI changes/behavior into the
  * base Devolutions Gateway Angular app.
  *
