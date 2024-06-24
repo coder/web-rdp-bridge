@@ -44,13 +44,19 @@ const SCREEN_POLL_INTERVAL_MS = 500;
 const formFieldEntries = {
   /** @readonly */
   username: {
+    /** @readonly */
     querySelector: "web-client-username-control input",
+
+    /** @readonly */
     value: "{{ CODER_USERNAME }}",
   },
 
   /** @readonly */
   password: {
+    /** @readonly */
     querySelector: "web-client-password-control input",
+
+    /** @readonly */
     value: "{{ CODER_PASSWORD }}",
   },
 };
