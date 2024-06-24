@@ -85,6 +85,9 @@ function setInputValue(inputField, inputText) {
       // write new text to it
       let i = -1;
 
+      /** @type {number | undefined} */
+      let currentAnimationId = undefined;
+
       /** @returns {void} */
       const handleNextCharIndex = () => {
         if (i === inputText.length) {
@@ -102,8 +105,8 @@ function setInputValue(inputField, inputText) {
             continueEventName,
             () => {
               i++;
-              const newDelay = (i + 1) * characterDelayMs;
-              window.setTimeout(handleNextCharIndex, newDelay);
+              currentAnimationId =
+                window.requestAnimationFrame(handleNextCharIndex);
             },
             { once: true }
           );
@@ -127,7 +130,7 @@ function setInputValue(inputField, inputText) {
         }
       };
 
-      window.setTimeout(handleNextCharIndex, characterDelayMs);
+      currentAnimationId = window.requestAnimationFrame(handleNextCharIndex);
     })
   );
 
